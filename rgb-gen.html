@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Minecraft RGB Gradient Generator</title>
+  <style>
+    :root{
+      --bg:#071029; --card:#0f1724; --muted:#9aa4bf; --accent:#60a5fa; --radius:12px;
+      font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#071029 0%, #071722 100%);color:#e6eef8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px}
+    .app{width:100%;max-width:980px}
+    h1{margin:0;font-size:20px}
+    p.lead{margin:6px 0 0;color:var(--muted);font-size:13px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));border:1px solid rgba(255,255,255,0.03);padding:16px;border-radius:var(--radius);box-shadow:0 8px 24px rgba(2,6,23,0.6)}
+    .row{display:flex;gap:12px}
+    .col{flex:1}
+    label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted)}
+    input[type=text], textarea, select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-family:inherit}
+    textarea{min-height:120px;resize:vertical}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    button{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;color:#022339;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+    .colors-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+    .color-item{display:flex;gap:8px;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.02)}
+    .color-item input[type=color]{width:44px;height:36px;padding:0;border:none;background:transparent}
+    .color-item input[type=text]{width:100%;}
+    .remove{background:#f87171;color:#2b0505;padding:6px 8px;border-radius:6px;border:none;cursor:pointer}
+    .preview{padding:12px;border-radius:10px;margin-top:12px;background:linear-gradient(180deg, rgba(0,0,0,0.12), transparent);border:1px solid rgba(255,255,255,0.02)}
+    .css-preview{font-weight:700;letter-spacing:0.3px;padding:8px;border-radius:6px;display:inline-block}
+    .chars{margin-top:8px;padding:8px;border-radius:6px;background:rgba(255,255,255,0.02);overflow:auto}
+    .small{font-size:12px;color:var(--muted)}
+    footer{margin-top:14px;text-align:right}
+    @media (max-width:720px){.row{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header style="margin-bottom:14px">
+      <h1>Minecraft RGB Gradient Generator</h1>
+      <p class="lead">Create gradients up to 10 color stops and export in <strong>normal</strong>, <strong>skript</strong>, or <strong>minimessage</strong> formats.</p>
+    </header>
+
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label>Text to color</label>
+          <input id="text" type="text" value="Minecraft RGB Gen!" />
+
+          <div style="margin-top:12px;display:flex;align-items:center;gap:8px;justify-content:space-between">
+            <div>
+              <label class="small">Format</label>
+              <select id="format">
+                <option value="normal">Normal (&#38;#HEXchar)</option>
+                <option value="skript">Skript (##HEXchar)</option>
+                <option value="minimessage">MiniMessage (&lt;gradient:...&gt;...&lt;/gradient&gt;)</option>
+              </select>
+            </div>
+            <div>
+              <label class="small">Max colors</label>
+              <div class="small">10</div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <label class="small">Color stops</label>
+            <div id="colors" class="colors-grid"></div>
+            <div class="controls">
+              <button id="addColor">Add color</button>
+              <button id="resetColors" class="ghost">Reset</button>
+              <div style="margin-left:auto" class="small">Stops: <span id="count">3</span>/10</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="width:320px">
+          <label>Preview</label>
+          <div class="preview">
+            <div id="cssPreview" class="css-preview">CSS gradient preview</div>
+            <div id="chars" class="chars"></div>
+          </div>
+
+          <div style="margin-top:10px">
+            <label class="small">Output</label>
+            <textarea id="output"></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button id="copy">Copy output</button>
+              <button id="showRaw" class="ghost">Show raw</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="small">Normal: &#38;#HEXchar  — Skript: ##HEXchar — MiniMessage: &lt;gradient:#hex1:#hex2&gt;text&lt;/gradient&gt;</div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    // Helpers
+    const maxColors = 10;
+    const defaultColors = ['#ff0000','#00ff00','#0000ff'];
+
+    function hexToRgb(hex){
+      const h = hex.replace('#','');
+      const bigint = parseInt(h,16);
+      return {r:(bigint>>16)&255,g:(bigint>>8)&255,b:bigint&255};
+    }
+    function rgbToHex({r,g,b}){
+      return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+    }
+    function lerp(a,b,t){return a + (b-a)*t}
+    function lerpRgb(a,b,t){return {r:lerp(a.r,b.r,t), g:lerp(a.g,b.g,t), b:lerp(a.b,b.b,t)}}
+
+    function sampleGradient(stops,t){
+      if(stops.length===1) return hexToRgb(stops[0]);
+      const segCount = stops.length - 1;
+      const seg = Math.min(Math.floor(t * segCount), segCount - 1);
+      const segT = (t - seg/segCount) * segCount;
+      const a = hexToRgb(stops[seg]);
+      const b = hexToRgb(stops[seg+1]);
+      return lerpRgb(a,b,segT);
+    }
+
+    // DOM
+    const colorsEl = document.getElementById('colors');
+    const addBtn = document.getElementById('addColor');
+    const resetBtn = document.getElementById('resetColors');
+    const textEl = document.getElementById('text');
+    const formatEl = document.getElementById('format');
+    const outputEl = document.getElementById('output');
+    const charsEl = document.getElementById('chars');
+    const cssPreviewEl = document.getElementById('cssPreview');
+    const countEl = document.getElementById('count');
+    const copyBtn = document.getElementById('copy');
+    const showRawBtn = document.getElementById('showRaw');
+
+    let stops = [...defaultColors];
+
+    function renderColors(){
+      colorsEl.innerHTML = '';
+      stops.forEach((c,i)=>{
+        const item = document.createElement('div'); item.className = 'color-item';
+        const colorInput = document.createElement('input'); colorInput.type='color'; colorInput.value=c;
+        colorInput.addEventListener('input', e=>{ stops[i] = e.target.value; update(); });
+        const textInput = document.createElement('input'); textInput.type='text'; textInput.value=c;
+        textInput.addEventListener('change', e=>{ let v = e.target.value.trim(); if(v && !v.startsWith('#')) v = '#'+v; if(/^#?[0-9A-Fa-f]{6}$/.test(v.replace('#',''))){ stops[i] = v.startsWith('#')?v:'#'+v; update(); } else { alert('Enter a 6-digit hex like #ff00aa'); } });
+        const remove = document.createElement('button'); remove.className='remove'; remove.textContent='Remove';
+        remove.addEventListener('click', ()=>{ if(stops.length>1){ stops.splice(i,1); update(); }});
+        item.appendChild(colorInput); item.appendChild(textInput); item.appendChild(remove);
+        colorsEl.appendChild(item);
+      });
+      countEl.textContent = stops.length;
+    }
+
+    function update(){
+      renderColors();
+      const text = textEl.value || '';
+      // css gradient preview
+      const css = stops.join(', ');
+      cssPreviewEl.style.background = `linear-gradient(90deg, ${css})`;
+      cssPreviewEl.style.webkitBackgroundClip = 'text';
+      cssPreviewEl.style.backgroundClip = 'text';
+      cssPreviewEl.style.color = 'transparent';
+      cssPreviewEl.textContent = text || 'Preview';
+
+      // per-char coloring
+      const chars = text.split('');
+      charsEl.innerHTML = '';
+      const colored = chars.map((ch,i)=>{
+        const t = chars.length===1?0:(chars.length>1? i/(chars.length-1) : 0);
+        const rgb = sampleGradient(stops,t);
+        const hex = rgbToHex(rgb).replace('#','');
+        return {ch,hex};
+      });
+      colored.forEach(c=>{ const span = document.createElement('span'); span.textContent = c.ch; span.style.color = '#' + c.hex; span.style.fontFamily='monospace'; span.style.fontWeight='600'; span.style.fontSize='15px'; charsEl.appendChild(span); });
+
+      // build output
+      const fmt = formatEl.value;
+      let out = '';
+      if(fmt === 'minimessage'){
+        if(stops.length === 1){
+          out = `<color:${stops[0]}>${escapeMin(text)}</color>`;
+        } else {
+          out = `<gradient:${stops.join(':')}>${escapeMin(text)}</gradient>`;
+        }
+      } else if(fmt === 'normal'){
+        out = colored.map(c=>`&#${c.hex}${c.ch}`).join('');
+      } else if(fmt === 'skript'){
+        out = colored.map(c=>`##${c.hex}${c.ch}`).join('');
+      }
+      outputEl.value = out;
+    }
+
+    function escapeMin(s){ return s.replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+    // events
+    addBtn.addEventListener('click', ()=>{ if(stops.length < maxColors){ stops.push('#ffffff'); update(); } else alert('Max ' + maxColors + ' colors'); });
+    resetBtn.addEventListener('click', ()=>{ stops = [...defaultColors]; update(); });
+    textEl.addEventListener('input', update);
+    formatEl.addEventListener('change', update);
+    copyBtn.addEventListener('click', ()=>{ navigator.clipboard.writeText(outputEl.value).then(()=>{ alert('Copied to clipboard') }).catch(e=>alert('Copy failed: '+e)); });
+    showRawBtn.addEventListener('click', ()=>{ alert(outputEl.value) });
+
+    // init
+    update();
+  </script>
+</body>
+</html>
